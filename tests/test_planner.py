@@ -217,3 +217,35 @@ def test_stop_hdmi_zone_left_at_zero():
     steps = flat(plan)
     assert Pause("restaurant") not in steps
     assert steps[-1] == VolumeSet("restaurant", 0.0)
+
+
+def test_already_in_hdmi_group_is_not_restarted():
+    """Seen live: arc+era already in the arc's HDMI group (roam too, outside the route)."""
+    zones = dict(ZONES)
+    current = {
+        "restaurant": ZoneState(playing=True, uri="x-sonos-htastream:RINCON_AMP:spdif", volume=0.11,
+                                group=("restaurant", "bar", "garten")),
+        "bar": ZoneState(playing=True, uri="x-sonos-htastream:RINCON_AMP:spdif", volume=0.03,
+                         group=("restaurant", "bar", "garten")),
+        "garten": ZoneState(playing=True, uri="x-sonos-htastream:RINCON_AMP:spdif", volume=0.64,
+                            group=("restaurant", "bar", "garten")),
+    }
+    route = Route(("restaurant", "bar"), SourceKind.MIXER, interface="restaurant_hdmi", mixer_input="5", mic=True)
+    plan = plan_route(route, zones, IFACES, current, mixer_level_db=LEVELS)
+    steps = flat(plan)
+    assert not any(isinstance(s, (Unjoin, Pause, PlayUri, Join)) for s in steps)
+    assert not any(isinstance(s, VolumeSet) and s.volume == 0.0 for s in steps)
+    assert VolumeRamp("restaurant", 0.75, 3.0) in steps and VolumeRamp("bar", 0.80, 3.0) in steps
+    assert not any(getattr(s, "zone", None) == "garten" for s in steps)
+
+
+def test_member_missing_from_hdmi_group_is_joined_only():
+    current = {
+        "restaurant": ZoneState(playing=True, uri="x-sonos-htastream:RINCON_AMP:spdif", volume=0.75,
+                                group=("restaurant",)),
+        "bar": ZoneState(playing=False, group=("bar",)),
+    }
+    route = Route(("restaurant", "bar"), SourceKind.MIXER, interface="restaurant_hdmi", mixer_input="5", mic=False)
+    steps = flat(plan_route(route, ZONES, IFACES, current, mixer_level_db=LEVELS))
+    assert Join("restaurant", ("bar",)) in steps
+    assert not any(isinstance(s, (Unjoin, PlayUri)) for s in steps)

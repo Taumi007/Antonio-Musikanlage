@@ -207,12 +207,13 @@ def plan_route(
             f"Mixer {mixer} also feeds other zones; fading the Sonos volumes instead of the mixer"
         )
 
-    # Zones that already play exactly the requested feed keep streaming;
-    # muting the mixer is enough to make the switch silent.
+    # Zones that already play exactly the requested feed keep streaming and
+    # stay in their group; only their level is adjusted (mixer fade, or a
+    # Sonos ramp when the mixer is shared).
     keep_streaming = {
         z
         for z in target
-        if use_mixer_fade and state[z].playing and same_stream(state[z].uri, target_uri)
+        if target_uri and state[z].playing and same_stream(state[z].uri, target_uri)
     }
 
     # Stage 1: silence everything that is audible and about to change.
@@ -234,9 +235,12 @@ def plan_route(
     coordinator = _pick_coordinator(target, zones, iface)
     members = tuple(z for z in target if z != coordinator)
     wanted = set(target)
-    unjoin = [z for z in target if state[z].group and set(state[z].group) - wanted]
+    unjoin = [
+        z for z in target if z not in keep_streaming and state[z].group and set(state[z].group) - wanted
+    ]
     if route.kind is SourceKind.MIXER and iface and iface.kind is InterfaceKind.HDMI:
-        unjoin = [z for z in target if len(state[z].group) > 1]
+        # the HT stream must be started on its device while it is alone
+        unjoin = [z for z in target if z not in keep_streaming and len(state[z].group) > 1]
     plan.add(*(Unjoin(z) for z in unjoin))
 
     # Stage 3: stop the old content (the driver skips zones that already stopped).
@@ -276,8 +280,8 @@ def plan_route(
             )
         )
     else:
-        # Radio: start at 0 and ramp up after playback started.
-        plan.add(*(VolumeSet(z, 0.0) for z in target))
+        # Radio / shared mixer: start at 0 and ramp up after playback started.
+        plan.add(*(VolumeSet(z, 0.0) for z in target if z not in keep_streaming))
 
     # Stage 5: start playback on the coordinator, then group the members.
     if route.kind is SourceKind.MIXER:
@@ -288,8 +292,11 @@ def plan_route(
     else:
         plan.add(PlayFavorite(coordinator, route.favorite))
     current_group = set(state[coordinator].group) if coordinator in state else set()
-    if members and not (set(target) <= current_group and coordinator not in unjoin):
-        plan.add(Join(coordinator, members))
+    missing = tuple(
+        m for m in members if coordinator in unjoin or m in unjoin or m not in current_group
+    )
+    if missing:
+        plan.add(Join(coordinator, missing))
 
     # Stage 6: bring the level up.
     if route.kind is SourceKind.MIXER and use_mixer_fade:
