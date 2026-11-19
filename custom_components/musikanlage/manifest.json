@@ -4,7 +4,9 @@
   "after_dependencies": [
     "sonos"
   ],
-  "codeowners": [],
+  "codeowners": [
+    "@Taumi007"
+  ],
   "config_flow": true,
   "dependencies": [
     "media_player",
@@ -12,8 +14,9 @@
     "frontend",
     "panel_custom"
   ],
-  "documentation": "https://github.com/",
+  "documentation": "https://github.com/Taumi007/Antonio-Musikanlage",
   "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Taumi007/Antonio-Musikanlage/issues",
   "requirements": [],
   "version": "0.1.0"
 }
