@@ -154,3 +154,17 @@ def test_line_in_with_device_suffix_counts_as_same_stream():
     route = Route(("bar",), SourceKind.MIXER, interface="bar_line_in", mixer_input="5")
     steps = flat(plan_route(route, ZONES, IFACES, current, mixer_level_db=LEVELS))
     assert not any(isinstance(s, (Pause, PlayUri, VolumeRamp)) for s in steps)
+
+
+def test_unjoin_from_foreign_group_before_pause():
+    """Seen live: pausing a group member paused the whole group (other zone stopped)."""
+    current = {
+        "zimmer_1": ZoneState(playing=True, uri="x-rincon-stream:RINCON_FIVE_L", volume=0.6, group=("bar", "zimmer_1")),
+        "bar": ZoneState(playing=True, uri="x-rincon-stream:RINCON_FIVE_L", volume=0.8, group=("bar", "zimmer_1")),
+    }
+    route = Route(("zimmer_1",), SourceKind.RADIO, favorite="FV:2/5")
+    plan = plan_route(route, ZONES, IFACES, current)
+    unjoin = index(plan, lambda s: s == Unjoin("zimmer_1"))
+    pause = index(plan, lambda s: s == Pause("zimmer_1"))
+    assert unjoin < pause
+    assert not any(getattr(s, "zone", None) == "bar" for s in flat(plan))

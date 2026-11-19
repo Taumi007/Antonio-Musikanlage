@@ -228,10 +228,9 @@ def plan_route(
         stage.append(VolumeRamp(z, 0.0, timing.zone_down))
     plan.add(*stage)
 
-    # Stage 2: stop the old content.
-    plan.add(*(Pause(z) for z in target if state[z].playing and z not in keep_streaming))
-
-    # Stage 3: break groups that do not match the target layout.
+    # Stage 2: leave groups that contain zones outside the route FIRST.
+    # A pause on a Sonos group member pauses the whole group, which would
+    # silence zones this route must not touch.
     coordinator = _pick_coordinator(target, zones, iface)
     members = tuple(z for z in target if z != coordinator)
     wanted = set(target)
@@ -239,6 +238,9 @@ def plan_route(
     if route.kind is SourceKind.MIXER and iface and iface.kind is InterfaceKind.HDMI:
         unjoin = [z for z in target if len(state[z].group) > 1]
     plan.add(*(Unjoin(z) for z in unjoin))
+
+    # Stage 3: stop the old content (the driver skips zones that already stopped).
+    plan.add(*(Pause(z) for z in target if state[z].playing and z not in keep_streaming))
 
     if route.kind is SourceKind.NONE:
         # Leave every zone paused at its safe radio volume.
