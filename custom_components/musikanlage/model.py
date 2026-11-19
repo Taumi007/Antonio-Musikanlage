@@ -118,13 +118,19 @@ def validate_route(route: Route, zones: dict[str, Zone], interfaces: dict[str, I
             raise RouteError(f"Unknown interface: {route.interface}")
         iface = interfaces[route.interface]
         if iface.kind is InterfaceKind.HDMI:
+            # Only the HDMI device itself can play its input (other players
+            # answer UPnP 402). Others get it by joining its group afterwards.
+            # Measured: the HDMI device keeps its low latency as coordinator
+            # (116 ms solo and grouped), members play ~43 ms later.
+            if not any(zones[z].player == iface.player for z in route.zones):
+                raise RouteError(
+                    f"HDMI input {iface.id} needs its own device in the route "
+                    f"(others can only join its group)"
+                )
             others = [z for z in route.zones if zones[z].player != iface.player]
             if others:
-                # Sonos refuses to play the HT stream on the HDMI device while
-                # the command contains other players; and grouping raises latency.
-                raise RouteError(
-                    f"HDMI input {iface.id} can only be played on its own device; "
-                    f"route the other zones {others} through a line-in instead"
+                warnings.append(
+                    f"{others} join the HDMI group and play ~40 ms after the HDMI device"
                 )
         if route.is_latency_critical:
             wireless = [z for z in route.zones if zones[z].wireless]

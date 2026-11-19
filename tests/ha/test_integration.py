@@ -203,14 +203,26 @@ async def test_guard_clamps_foreign_loud_start(hass: HomeAssistant) -> None:
     assert entry.runtime_data.status.guard_events
 
 
-async def test_hdmi_with_two_zones_is_refused(hass: HomeAssistant) -> None:
+async def test_hdmi_without_owner_is_refused(hass: HomeAssistant) -> None:
     await _setup(hass)
     from homeassistant.exceptions import HomeAssistantError
 
-    with pytest.raises(HomeAssistantError, match="line-in"):
+    with pytest.raises(HomeAssistantError, match="own device"):
         await hass.services.async_call(
-            DOMAIN, "route", {"zones": ["arc", "era"], "source": "mixer:arc_hdmi", "input": "pc"}, blocking=True
+            DOMAIN, "route", {"zones": ["era"], "source": "mixer:arc_hdmi", "input": "pc"}, blocking=True
         )
+
+
+async def test_hdmi_group_owner_first_then_join(hass: HomeAssistant) -> None:
+    _, fake = await _setup(hass)
+    await hass.services.async_call(
+        DOMAIN, "route", {"zones": ["era", "arc"], "source": "mixer:arc_hdmi", "input": "pc", "mic": False},
+        blocking=True,
+    )
+    plays = [l for l in fake.log if l[1] == "play"]
+    assert plays == [(ARC, "play", "x-sonos-htastream:RINCON_ARC00001400:spdif", 0.30)]
+    join = next(i for i, l in enumerate(fake.log) if l[1] == "join")
+    assert fake.log[join][0] == ARC and fake.log.index(plays[0]) < join
 
 
 async def test_sidebar_panel_registered_and_removed(hass: HomeAssistant) -> None:

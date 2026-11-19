@@ -28,7 +28,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         hass,
         webcomponent_name="musikanlage-panel",
         frontend_url_path=PANEL_URL,
-        module_url=f"{STATIC_URL}/musikanlage-panel.js?v=0.1.4",
+        module_url=f"{STATIC_URL}/musikanlage-panel.js?v=0.2.0",
         sidebar_title="Musikanlage",
         sidebar_icon="mdi:speaker-multiple",
         require_admin=False,

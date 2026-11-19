@@ -87,10 +87,31 @@ def test_mixer_to_radio_never_starts_at_reference_volume():
     assert not any(isinstance(s, MixerFade) for s in steps)
 
 
-def test_hdmi_with_other_zones_is_rejected():
-    route = Route(("restaurant", "bar"), SourceKind.MIXER, interface="restaurant_hdmi", mixer_input="5")
-    with pytest.raises(RouteError, match="line-in"):
+def test_hdmi_without_its_device_is_rejected():
+    route = Route(("bar", "zimmer_1"), SourceKind.MIXER, interface="restaurant_hdmi", mixer_input="5")
+    with pytest.raises(RouteError, match="own device"):
         plan_route(route, ZONES, IFACES, {})
+
+
+def test_hdmi_group_plays_on_owner_alone_then_joins():
+    """Measured live: HDMI owner keeps low latency as coordinator; others join afterwards."""
+    current = {
+        "restaurant": ZoneState(playing=True, uri="x-sonosapi-stream:radio", volume=0.2,
+                                group=("restaurant", "bar")),
+        "bar": ZoneState(playing=True, uri="x-sonosapi-stream:radio", volume=0.35, group=("restaurant", "bar")),
+    }
+    route = Route(("bar", "restaurant", "zimmer_1"), SourceKind.MIXER, interface="restaurant_hdmi",
+                  mixer_input="5", mic=True)
+    plan = plan_route(route, ZONES, IFACES, current, mixer_level_db=LEVELS)
+    steps = flat(plan)
+    play = next(s for s in steps if isinstance(s, PlayUri))
+    assert play.zone == "restaurant" and play.hdmi
+    # restaurant must be alone when the HT stream starts
+    assert index(plan, lambda s: s == Unjoin("restaurant")) < index(plan, lambda s: s is play)
+    join = next(s for s in steps if isinstance(s, Join))
+    assert join.coordinator == "restaurant" and set(join.members) == {"bar", "zimmer_1"}
+    assert index(plan, lambda s: s is play) < index(plan, lambda s: s is join)
+    assert any("HDMI group" in w for w in plan.warnings)
 
 
 def test_wireless_zone_rejected_with_microphone():

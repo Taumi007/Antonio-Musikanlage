@@ -14,8 +14,12 @@ volume jumps**:
 * If a mixer also feeds a zone outside the route (e.g. Restaurant on HDMI while
   Bar takes the Amp's cinch line-in), the mixer is left alone and the Sonos
   volumes are faded instead.
-* HDMI inputs are only played on their own device (Sonos refuses the HT
-  stream when other players are in the command, and grouping raises latency).
+* HDMI inputs are started on their own device alone (other players refuse the
+  HT stream with UPnP 402); other zones then join its group. Measured with an
+  Arc: the HDMI device keeps its low latency as group coordinator (116 ms solo
+  and grouped), members play ~43 ms later and are in sync with each other.
+* Zones on the TV/HDMI input cannot be paused; they are held at volume 0 until
+  the new stream is confirmed.
 * Wireless zones (Move 2) are refused while the microphone is in use.
 * **Guard:** if anything outside the router (Sonos app, alarm, TV autoplay,
   `sonos.restore`, buttons) starts non-mixer content above
