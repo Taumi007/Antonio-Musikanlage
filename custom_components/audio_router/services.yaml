@@ -1,0 +1,69 @@
+route:
+  fields:
+    entry_id:
+      selector:
+        config_entry:
+          integration: audio_router
+    zones:
+      required: true
+      example: ["bar", "zimmer_1"]
+      selector:
+        object:
+    source:
+      required: true
+      example: "mixer:bar_line_in"
+      selector:
+        text:
+    input:
+      example: "pc"
+      selector:
+        text:
+    preset:
+      default: normal
+      selector:
+        select:
+          options: [normal, lauter, party]
+    mic:
+      default: true
+      selector:
+        boolean:
+    dry_run:
+      default: false
+      selector:
+        boolean:
+plan:
+  fields:
+    entry_id:
+      selector:
+        config_entry:
+          integration: audio_router
+    zones:
+      required: true
+      selector:
+        object:
+    source:
+      required: true
+      selector:
+        text:
+    input:
+      selector:
+        text:
+    preset:
+      default: normal
+      selector:
+        select:
+          options: [normal, lauter, party]
+    mic:
+      default: true
+      selector:
+        boolean:
+stop:
+  fields:
+    entry_id:
+      selector:
+        config_entry:
+          integration: audio_router
+    zones:
+      required: true
+      selector:
+        object:

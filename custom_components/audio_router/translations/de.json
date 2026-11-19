@@ -1,0 +1,117 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Audio Router",
+        "description": "Topologie als YAML. {detail}",
+        "data": {
+          "topology": "Topologie"
+        }
+      }
+    },
+    "error": {
+      "invalid_topology": "Ungültige Topologie"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Audio Router",
+        "description": "Topologie als YAML. {detail}",
+        "data": {
+          "topology": "Topologie"
+        }
+      }
+    },
+    "error": {
+      "invalid_topology": "Ungültige Topologie"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "route": {
+        "name": "Route"
+      }
+    }
+  },
+  "services": {
+    "route": {
+      "name": "Route schalten",
+      "description": "Quelle sicher auf Zonen schalten (Fade, Warten auf Gerätebestätigung).",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Nur nötig bei mehreren Routern."
+        },
+        "zones": {
+          "name": "Zonen",
+          "description": "Zonen-IDs aus der Topologie."
+        },
+        "source": {
+          "name": "Quelle",
+          "description": "mixer:<interface>, radio:<favorit> oder none."
+        },
+        "input": {
+          "name": "Mixer-Eingang",
+          "description": "Eingang am Mixer, z. B. pc."
+        },
+        "preset": {
+          "name": "Preset",
+          "description": "normal, lauter oder party."
+        },
+        "mic": {
+          "name": "Mikrofon",
+          "description": "Mikrofon einschalten."
+        },
+        "dry_run": {
+          "name": "Nur planen",
+          "description": "Nur den Ablauf zurückgeben, nichts schalten."
+        }
+      }
+    },
+    "plan": {
+      "name": "Route planen",
+      "description": "Gibt den Ablauf zurück, ohne zu schalten.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Nur nötig bei mehreren Routern."
+        },
+        "zones": {
+          "name": "Zonen",
+          "description": "Zonen-IDs."
+        },
+        "source": {
+          "name": "Quelle",
+          "description": "mixer:<interface>, radio:<favorit> oder none."
+        },
+        "input": {
+          "name": "Mixer-Eingang",
+          "description": "Eingang am Mixer."
+        },
+        "preset": {
+          "name": "Preset",
+          "description": "normal, lauter oder party."
+        },
+        "mic": {
+          "name": "Mikrofon",
+          "description": "Mikrofon einschalten."
+        }
+      }
+    },
+    "stop": {
+      "name": "Zonen stoppen",
+      "description": "Leise ausblenden, pausieren und auf Radio-Normal-Lautstärke zurücksetzen.",
+      "fields": {
+        "entry_id": {
+          "name": "Router",
+          "description": "Nur nötig bei mehreren Routern."
+        },
+        "zones": {
+          "name": "Zonen",
+          "description": "Zonen-IDs."
+        }
+      }
+    }
+  }
+}
