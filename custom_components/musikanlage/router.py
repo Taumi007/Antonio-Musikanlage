@@ -185,14 +185,19 @@ class AudioRouter:
                 raise RuntimeError(f"Unknown step {step}")
 
     async def _emergency_quiet(self, route: Route) -> None:
-        """After a failed step: never leave a zone loud on an unknown source."""
+        """After a failed step: never leave a zone loud on an unknown source.
+
+        Volume first (works on every input), then pause; each step is tried
+        on its own so one failure does not skip the other.
+        """
         for zid in route.zones:
-            try:
-                drv = self.sonos[zid]
-                await drv.pause()
-                await drv.set_volume(self.topo.zones[zid].radio_volume.get(Preset.NORMAL, 0.1))
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.error("Emergency quiet failed for %s: %s", zid, err)
+            drv = self.sonos[zid]
+            safe = self.topo.zones[zid].radio_volume.get(Preset.NORMAL, 0.1)
+            for action in (lambda: drv.set_volume(safe), drv.pause):
+                try:
+                    await action()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.error("Emergency quiet step failed for %s: %s", zid, err)
 
     # ------------------------------------------------------------------ guard
 
