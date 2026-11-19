@@ -16,7 +16,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 
-from custom_components.audio_router.const import DOMAIN
+from custom_components.musikanlage.const import DOMAIN
 
 ARC = "media_player.schlafzimmer_sonos"
 ERA = "media_player.schlafzimmer_sonos_vorne"
@@ -172,7 +172,7 @@ async def test_radio_to_line_in_waits_and_never_plays_loud(hass: HomeAssistant) 
     assert hass.states.get(ERA).attributes["volume_level"] == 0.25
     assert hass.states.get(ARC).attributes["volume_level"] == 0.30
     assert resp["warnings"] == []
-    assert hass.states.get("sensor.audio_router_route").state == "idle"
+    assert hass.states.get("sensor.musikanlage_route").state == "idle"
 
 
 async def test_back_to_radio_starts_silent(hass: HomeAssistant) -> None:
@@ -209,3 +209,15 @@ async def test_hdmi_with_two_zones_is_refused(hass: HomeAssistant) -> None:
         await hass.services.async_call(
             DOMAIN, "route", {"zones": ["arc", "era"], "source": "mixer:arc_hdmi", "input": "pc"}, blocking=True
         )
+
+
+async def test_sidebar_panel_registered_and_removed(hass: HomeAssistant) -> None:
+    entry, _ = await _setup(hass)
+    panels = hass.data["frontend_panels"]
+    assert panels["musikanlage"].sidebar_title == "Musikanlage"
+    assert panels["musikanlage"].sidebar_icon == "mdi:speaker-multiple"
+    attrs = hass.states.get("sensor.musikanlage_route").attributes
+    assert {z["id"] for z in attrs["options"]["zones"]} == {"arc", "era"}
+    assert attrs["options"]["favorites"] == ["oe3"]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert "musikanlage" not in hass.data["frontend_panels"]

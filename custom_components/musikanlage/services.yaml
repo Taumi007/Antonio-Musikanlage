@@ -3,7 +3,7 @@ route:
     entry_id:
       selector:
         config_entry:
-          integration: audio_router
+          integration: musikanlage
     zones:
       required: true
       example: ["bar", "zimmer_1"]
@@ -36,7 +36,7 @@ plan:
     entry_id:
       selector:
         config_entry:
-          integration: audio_router
+          integration: musikanlage
     zones:
       required: true
       selector:
@@ -62,7 +62,7 @@ stop:
     entry_id:
       selector:
         config_entry:
-          integration: audio_router
+          integration: musikanlage
     zones:
       required: true
       selector:

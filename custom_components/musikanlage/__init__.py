@@ -1,4 +1,4 @@
-"""Audio Router: safe source routing between Sonos players and mixers."""
+"""Musikanlage: safe source routing between Sonos players and mixers."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ from .const import (
     SERVICE_ROUTE,
     SERVICE_STOP,
 )
+from .panel import async_register_panel, async_remove_panel
 from .model import Route, RouteError, SourceKind
 from .router import AudioRouter
 from .topology import TopologyError, parse_topology
@@ -35,7 +36,7 @@ from .topology import TopologyError, parse_topology
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR]
 
-type AudioRouterConfigEntry = ConfigEntry[AudioRouter]
+type MusikanlageConfigEntry = ConfigEntry[AudioRouter]
 
 ROUTE_SCHEMA = vol.Schema(
     {
@@ -70,7 +71,7 @@ def sonos_uids(hass: HomeAssistant) -> dict[str, str]:
     return out
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: AudioRouterConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: MusikanlageConfigEntry) -> bool:
     try:
         raw = yaml.safe_load(entry.options.get(CONF_TOPOLOGY, entry.data.get(CONF_TOPOLOGY, "")))
         topology = parse_topology(raw, sonos_uids(hass))
@@ -84,15 +85,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: AudioRouterConfigEntry) 
     entry.async_on_unload(entry.add_update_listener(_reload))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
+    await async_register_panel(hass)
     return True
 
 
-async def _reload(hass: HomeAssistant, entry: AudioRouterConfigEntry) -> None:
+async def _reload(hass: HomeAssistant, entry: MusikanlageConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: AudioRouterConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+async def async_unload_entry(hass: HomeAssistant, entry: MusikanlageConfigEntry) -> bool:
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded and not [
+        e for e in hass.config_entries.async_loaded_entries(DOMAIN) if e.entry_id != entry.entry_id
+    ]:
+        async_remove_panel(hass)
+    return unloaded
 
 
 def _router(hass: HomeAssistant, call: ServiceCall) -> AudioRouter:
@@ -100,7 +107,7 @@ def _router(hass: HomeAssistant, call: ServiceCall) -> AudioRouter:
     if entry_id := call.data.get("entry_id"):
         entries = [e for e in entries if e.entry_id == entry_id]
     if len(entries) != 1:
-        raise HomeAssistantError("Specify entry_id (none or several audio_router entries loaded)")
+        raise HomeAssistantError("Specify entry_id (none or several musikanlage entries loaded)")
     return entries[0].runtime_data
 
 

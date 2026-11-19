@@ -50,7 +50,7 @@ def _schema(default: str) -> vol.Schema:
     )
 
 
-class AudioRouterConfigFlow(ConfigFlow, domain=DOMAIN):
+class MusikanlageConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -60,7 +60,7 @@ class AudioRouterConfigFlow(ConfigFlow, domain=DOMAIN):
             errors = _validate(self.hass, user_input[CONF_TOPOLOGY])
             detail = errors.pop("_detail", "")
             if not errors:
-                return self.async_create_entry(title="Audio Router", data=user_input)
+                return self.async_create_entry(title="Musikanlage", data=user_input)
         return self.async_show_form(
             step_id="user",
             data_schema=_schema(user_input[CONF_TOPOLOGY] if user_input else EXAMPLE),
@@ -71,10 +71,10 @@ class AudioRouterConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return AudioRouterOptionsFlow()
+        return MusikanlageOptionsFlow()
 
 
-class AudioRouterOptionsFlow(OptionsFlow):
+class MusikanlageOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         detail = ""

@@ -255,6 +255,21 @@ class AudioRouter:
             nodes.append({"id": "radio", "type": "radio"})
         return {"nodes": nodes, "edges": edges}
 
+    def options(self) -> dict[str, Any]:
+        """What the panel can offer as quick actions."""
+        return {
+            "zones": [
+                {"id": zid, "player": z.player, "wireless": z.wireless}
+                for zid, z in self.topo.zones.items()
+            ],
+            "interfaces": [
+                {"id": iid, "kind": i.kind.value, "mixer": i.mixer, "player": i.player}
+                for iid, i in self.topo.interfaces.items()
+            ],
+            "mixer_inputs": {mid: list(m.inputs) for mid, m in self.topo.mixers.items()},
+            "favorites": list(self.topo.favorites),
+        }
+
     @callback
     def _notify(self) -> None:
         self.status.updated = dt_util.utcnow()

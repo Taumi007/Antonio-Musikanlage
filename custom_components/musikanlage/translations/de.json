@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Audio Router",
+        "title": "Musikanlage",
         "description": "Topologie als YAML. {detail}",
         "data": {
           "topology": "Topologie"
@@ -16,7 +16,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "Audio Router",
+        "title": "Musikanlage",
         "description": "Topologie als YAML. {detail}",
         "data": {
           "topology": "Topologie"

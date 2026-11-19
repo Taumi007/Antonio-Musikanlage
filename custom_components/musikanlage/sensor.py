@@ -10,13 +10,13 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
-from . import AudioRouterConfigEntry
+from . import MusikanlageConfigEntry
 from .const import DOMAIN, SIGNAL_ROUTE_UPDATED
 from .router import AudioRouter
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: AudioRouterConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
+    hass: HomeAssistant, entry: MusikanlageConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     async_add_entities([RouteSensor(entry.runtime_data, entry.entry_id)])
 
@@ -29,7 +29,7 @@ class RouteSensor(SensorEntity):
     def __init__(self, router: AudioRouter, entry_id: str) -> None:
         self.router = router
         self._attr_unique_id = f"{entry_id}_route"
-        self._attr_device_info = {"identifiers": {(DOMAIN, entry_id)}, "name": "Audio Router"}
+        self._attr_device_info = {"identifiers": {(DOMAIN, entry_id)}, "name": "Musikanlage"}
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(
@@ -66,4 +66,5 @@ class RouteSensor(SensorEntity):
             "last_warnings": s.last_warnings,
             "last_error": s.last_error,
             "guard_events": s.guard_events,
+            "options": self.router.options(),
         }

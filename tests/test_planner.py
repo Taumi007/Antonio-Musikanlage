@@ -2,8 +2,8 @@
 
 import pytest
 
-from audio_router.model import Interface, InterfaceKind, Preset, Route, RouteError, SourceKind, Zone
-from audio_router.planner import (
+from musikanlage.model import Interface, InterfaceKind, Preset, Route, RouteError, SourceKind, Zone
+from musikanlage.planner import (
     Join,
     MixerFade,
     MixerMic,

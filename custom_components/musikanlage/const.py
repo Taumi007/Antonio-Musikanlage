@@ -1,6 +1,6 @@
 """Constants."""
 
-DOMAIN = "audio_router"
+DOMAIN = "musikanlage"
 CONF_TOPOLOGY = "topology"
 
 SERVICE_ROUTE = "route"

@@ -1,6 +1,6 @@
 import pytest
 
-from audio_router.xair import db_to_pos, pos_to_db, ramp_db
+from musikanlage.xair import db_to_pos, pos_to_db, ramp_db
 
 
 @pytest.mark.parametrize(

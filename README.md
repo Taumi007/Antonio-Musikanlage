@@ -1,4 +1,4 @@
-# Audio Router (Home Assistant custom integration)
+# Musikanlage (Home Assistant custom integration)
 
 Routes audio between Sonos players and mixers (Behringer X Air) **without
 volume jumps**:
@@ -25,11 +25,11 @@ volume jumps**:
 
 | Service | Purpose |
 |---|---|
-| `audio_router.route` | `zones`, `source` (`mixer:<interface>`, `radio:<favourite>`, `none`), `input`, `preset`, `mic`, `dry_run` |
-| `audio_router.plan` | Same fields; returns the plan only |
-| `audio_router.stop` | Fade out, pause, reset to radio-normal volume |
+| `musikanlage.route` | `zones`, `source` (`mixer:<interface>`, `radio:<favourite>`, `none`), `input`, `preset`, `mic`, `dry_run` |
+| `musikanlage.plan` | Same fields; returns the plan only |
+| `musikanlage.stop` | Fade out, pause, reset to radio-normal volume |
 
-`sensor.audio_router_route` carries the routing graph (`graph` attribute) for
+`sensor.musikanlage_route` carries the routing graph (`graph` attribute) for
 the flow diagram, the last plan, warnings, errors and guard events.
 
 ## Topology (config flow, YAML)

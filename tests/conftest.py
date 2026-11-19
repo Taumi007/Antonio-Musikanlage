@@ -4,8 +4,8 @@ import sys
 import types
 from pathlib import Path
 
-PKG_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "audio_router"
+PKG_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "musikanlage"
 
-pkg = types.ModuleType("audio_router")
+pkg = types.ModuleType("musikanlage")
 pkg.__path__ = [str(PKG_DIR)]
-sys.modules.setdefault("audio_router", pkg)
+sys.modules.setdefault("musikanlage", pkg)
