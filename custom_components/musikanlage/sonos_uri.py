@@ -21,6 +21,26 @@ def is_input_stream(uri: str | None) -> bool:
     return bool(uri) and uri.startswith((LINE_IN_PREFIX, HDMI_PREFIX))
 
 
+def stream_key(uri: str | None) -> tuple[str, str] | None:
+    """(kind, uid) of an input stream, ignoring device-specific suffixes.
+
+    Players report the same input differently, e.g.
+    ``x-rincon-stream:RINCON_X`` vs. ``x-rincon-stream:RINCON_X:0``.
+    """
+    if not is_input_stream(uri):
+        return None
+    kind = "hdmi" if uri.startswith(HDMI_PREFIX) else "line_in"
+    return kind, uid_from_uri(uri)
+
+
+def same_stream(a: str | None, b: str | None) -> bool:
+    """True if both URIs are the same input stream (or literally equal)."""
+    if a == b:
+        return a is not None
+    ka = stream_key(a)
+    return ka is not None and ka == stream_key(b)
+
+
 def uid_from_uri(uri: str | None) -> str | None:
     """Extract the RINCON uid of the device whose input is played."""
     if not uri:

@@ -30,3 +30,13 @@ def test_ramp_ends_exactly_and_is_monotonic():
     assert all(b > a for a, b in zip(r, r[1:]))
     down = ramp_db(-10, -90, 5)
     assert down[-1] == -90
+
+
+def test_same_stream_ignores_suffix():
+    from musikanlage.sonos_uri import same_stream, stream_key
+
+    assert same_stream("x-rincon-stream:RINCON_A:0", "x-rincon-stream:RINCON_A")
+    assert not same_stream("x-rincon-stream:RINCON_A", "x-rincon-stream:RINCON_B")
+    assert not same_stream("x-sonos-htastream:RINCON_A:spdif", "x-rincon-stream:RINCON_A")
+    assert stream_key("x-sonosapi-stream:radio") is None
+    assert not same_stream(None, None)

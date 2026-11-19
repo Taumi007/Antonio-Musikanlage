@@ -32,7 +32,7 @@ from .planner import (
     ZoneState,
     plan_route,
 )
-from .sonos_uri import is_input_stream
+from .sonos_uri import is_input_stream, stream_key
 from .topology import Topology
 
 _LOGGER = logging.getLogger(__name__)
@@ -242,9 +242,7 @@ class AudioRouter:
                           "volume": s.volume, "wireless": z.wireless, "group": list(s.group)})
             if s.playing and is_input_stream(s.uri):
                 for iid, i in self.topo.interfaces.items():
-                    if s.uri and i.uid in s.uri and (
-                        ("htastream" in s.uri) == (i.kind.value == "hdmi")
-                    ):
+                    if stream_key(s.uri) == (i.kind.value, i.uid):
                         edges.append({"from": f"iface:{iid}", "to": f"zone:{zid}", "active": True})
                         for e in edges:
                             if e["to"] == f"iface:{iid}":

@@ -32,7 +32,7 @@ from .model import (
     Zone,
     validate_route,
 )
-from .sonos_uri import interface_uri, is_input_stream, uid_from_uri
+from .sonos_uri import interface_uri, is_input_stream, same_stream, uid_from_uri
 
 MIXER_OFF_DB = -90.0
 
@@ -212,7 +212,7 @@ def plan_route(
     keep_streaming = {
         z
         for z in target
-        if use_mixer_fade and state[z].playing and state[z].uri == target_uri
+        if use_mixer_fade and state[z].playing and same_stream(state[z].uri, target_uri)
     }
 
     # Stage 1: silence everything that is audible and about to change.

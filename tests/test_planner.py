@@ -146,3 +146,11 @@ def test_stop_leaves_safe_volume():
     steps = flat(plan)
     assert steps[-1] == VolumeSet("bar", 0.20)
     assert index(plan, lambda s: isinstance(s, Pause)) < len(plan.stages) - 1
+
+
+def test_line_in_with_device_suffix_counts_as_same_stream():
+    """Era 100 reports x-rincon-stream:<UID>:0 (seen live on Taumihause)."""
+    current = {"bar": ZoneState(playing=True, uri="x-rincon-stream:RINCON_FIVE_L:0", volume=0.8, group=("bar",))}
+    route = Route(("bar",), SourceKind.MIXER, interface="bar_line_in", mixer_input="5")
+    steps = flat(plan_route(route, ZONES, IFACES, current, mixer_level_db=LEVELS))
+    assert not any(isinstance(s, (Pause, PlayUri, VolumeRamp)) for s in steps)

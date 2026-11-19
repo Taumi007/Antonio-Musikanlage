@@ -18,6 +18,7 @@ from .const import (
     VOLUME_TOLERANCE,
 )
 from .feedback import FeedbackTimeout, wait_for_state
+from .sonos_uri import same_stream
 from .topology import MixerConfig
 from .xair import MIN_DB, db_to_pos, pos_to_db, ramp_db
 
@@ -109,7 +110,7 @@ class SonosDriver:
             await wait_for_state(
                 self.hass,
                 self.entity_id,
-                lambda s: s.state == "playing" and s.attributes.get("media_content_id") == uri,
+                lambda s: s.state == "playing" and same_stream(s.attributes.get("media_content_id"), uri),
                 TIMEOUT_TRANSPORT,
                 f"playing {uri}",
             )

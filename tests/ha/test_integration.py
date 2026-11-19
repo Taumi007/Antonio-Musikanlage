@@ -96,8 +96,10 @@ class FakeSonos:
                 uri = call.data["media"]["media_content_id"]
                 vol = self._attrs(p)["volume_level"]
                 self.log.append((p, "play", uri, vol))
+                # real players append a suffix to line-in streams (Era 100: ":0")
+                reported = f"{uri}:0" if uri.startswith("x-rincon-stream:") else uri
                 hass.async_create_task(
-                    self._later(lambda p=p, uri=uri: self._set(p, "playing", media_content_id=uri))
+                    self._later(lambda p=p, r=reported: self._set(p, "playing", media_content_id=r))
                 )
 
         async def join(call):
