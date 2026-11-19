@@ -28,6 +28,7 @@ from .const import (
     SERVICE_ROUTE,
     SERVICE_STOP,
 )
+from . import websocket
 from .panel import async_register_panel, async_remove_panel
 from .model import Route, RouteError, SourceKind
 from .router import AudioRouter
@@ -85,6 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MusikanlageConfigEntry) 
     entry.async_on_unload(entry.add_update_listener(_reload))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
+    websocket.async_register(hass)
     await async_register_panel(hass)
     return True
 

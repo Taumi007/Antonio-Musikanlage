@@ -70,6 +70,9 @@ class AudioRouter:
     def async_start(self) -> None:
         players = [z.player for z in self.topo.zones.values()]
         self._unsub.append(async_track_state_change_event(self.hass, players, self._guard))
+        trackers = [f.tracker for f in self.topo.follow_ap]
+        if trackers:
+            self._unsub.append(async_track_state_change_event(self.hass, trackers, self._ap_changed))
 
     @callback
     def async_stop(self) -> None:
@@ -272,6 +275,93 @@ class AudioRouter:
             "mixer_inputs": {mid: list(m.inputs) for mid, m in self.topo.mixers.items()},
             "favorites": list(self.topo.favorites),
         }
+
+    # ------------------------------------------------------------------ quick actions
+
+    async def async_quick_action(self, action_id: str, dry_run: bool = False) -> Plan:
+        qa = next((q for q in self.topo.quick_actions if q.id == action_id), None)
+        if qa is None:
+            raise HomeAssistantError(f"Unknown quick action {action_id}")
+        try:
+            route = self.build_route(list(qa.zones), qa.source, qa.input, qa.preset, qa.mic)
+        except (RouteError, ValueError) as err:
+            raise HomeAssistantError(str(err)) from err
+        return await self.async_route(route, dry_run=dry_run)
+
+    # ------------------------------------------------------------------ follow access point
+
+    def ap_info(self) -> list[dict[str, Any]]:
+        """Where each portable speaker is (UniFi) and which zone that means."""
+        out = []
+        for f in self.topo.follow_ap:
+            st = self.hass.states.get(f.tracker)
+            ap = (st.attributes.get("ap_mac") or "").lower() if st else ""
+            out.append({
+                "zone": f.zone,
+                "tracker": f.tracker,
+                "connected": bool(st and st.state == "home"),
+                "ap_mac": ap or None,
+                "ap_name": self._ap_name(ap),
+                "essid": st.attributes.get("essid") if st else None,
+                "target": f.aps.get(ap),
+                "auto": f.auto,
+            })
+        return out
+
+    def _ap_name(self, ap_mac: str) -> str | None:
+        if not ap_mac:
+            return None
+        for st in self.hass.states.async_all("device_tracker"):
+            if (st.attributes.get("mac") or "").lower() == ap_mac:
+                return st.attributes.get("friendly_name") or st.entity_id
+        return None
+
+    @callback
+    def _ap_changed(self, event: Event[EventStateChangedData]) -> None:
+        new, old = event.data["new_state"], event.data["old_state"]
+        if new is None:
+            return
+        ap = (new.attributes.get("ap_mac") or "").lower()
+        if old is not None and (old.attributes.get("ap_mac") or "").lower() == ap:
+            return
+        self._notify()
+        for f in self.topo.follow_ap:
+            if f.tracker == new.entity_id and f.auto and ap in f.aps:
+                self.hass.async_create_task(self.async_follow(f.zone, f.aps[ap]))
+
+    async def async_follow(self, zone: str, target: str) -> list[str]:
+        """Join a portable zone to the group the target zone plays in."""
+        state = self.current_state()
+        t = state.get(target)
+        if t is None or not t.playing:
+            return [f"{target} spielt nicht, {zone} bleibt wie es ist"]
+        if zone in t.group:
+            return [f"{zone} ist schon bei {target}"]
+        last = self.status.last_route or {}
+        if self.topo.zones[zone].wireless and last.get("mic") and target in (last.get("zones") or []):
+            msg = f"{zone} nicht verbunden: in {target} läuft eine Route mit Mikrofon"
+            self.status.guard_events = [msg, *self.status.guard_events][:10]
+            self._notify()
+            return [msg]
+        coord_player = (self.hass.states.get(self.topo.zones[target].player).attributes.get("group_members") or [None])[0]
+        coord = self._zone_by_player(coord_player) if coord_player else None
+        coord = coord or target
+        mixer = None
+        key = stream_key(t.uri)
+        if key:
+            mixer = next((i.mixer for i in self.topo.interfaces.values() if (i.kind.value, i.uid) == key), None)
+        z = self.topo.zones[zone]
+        volume = z.mixer_volume.get(mixer, 0.0) if mixer else z.radio_volume.get(Preset.NORMAL, 0.1)
+        steps: list[Step] = [VolumeRamp(zone, 0.0, 1.0), VolumeSet(zone, 0.0), Join(coord, (zone,)), VolumeRamp(zone, volume, 2.0)]
+        async with self._lock:
+            self._in_transition = {zone}
+            try:
+                for step in steps:
+                    await self._run(step)
+            finally:
+                self._in_transition = set()
+                self._notify()
+        return [s.describe() for s in steps]
 
     @callback
     def _notify(self) -> None:

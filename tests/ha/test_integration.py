@@ -43,6 +43,9 @@ zones:
     radio_volume: {normal: 0.10, lauter: 0.18, party: 0.25}
 favorites:
   oe3: "FV:2/4"
+quick_actions:
+  - {id: radio_schlaf, name: "Radio Schlafzimmer", area: Schlafzimmer, zones: [era], source: "radio:oe3", preset: normal}
+  - {id: mixer_beide, name: "Mixer beide", area: Schlafzimmer, zones: [era, arc], source: "mixer:era_line_in", input: pc, mic: false}
 """
 
 
@@ -128,7 +131,7 @@ class FakeSonos:
             hass.services.async_register("media_player", name, fn)
 
 
-async def _setup(hass: HomeAssistant) -> tuple[MockConfigEntry, FakeSonos]:
+async def _setup(hass: HomeAssistant, topology: str = TOPOLOGY) -> tuple[MockConfigEntry, FakeSonos]:
     sonos_entry = MockConfigEntry(domain="sonos")
     sonos_entry.add_to_hass(hass)
     dev_reg, ent_reg = dr.async_get(hass), er.async_get(hass)
@@ -139,7 +142,7 @@ async def _setup(hass: HomeAssistant) -> tuple[MockConfigEntry, FakeSonos]:
         )
     fake = FakeSonos(hass)
     assert await async_setup_component(hass, "media_player", {})
-    entry = MockConfigEntry(domain=DOMAIN, data={"topology": TOPOLOGY})
+    entry = MockConfigEntry(domain=DOMAIN, data={"topology": topology})
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -235,3 +238,64 @@ async def test_sidebar_panel_registered_and_removed(hass: HomeAssistant) -> None
     assert attrs["options"]["favorites"] == ["oe3"]
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert "musikanlage" not in hass.data["frontend_panels"]
+
+
+async def test_websocket_get_save_and_quick_action(hass: HomeAssistant, hass_ws_client) -> None:
+    entry, fake = await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "musikanlage/get"})
+    res = (await ws.receive_json())["result"]
+    assert {q["id"] for q in res["quick_actions"]} == {"radio_schlaf", "mixer_beide"}
+    assert {p["entity_id"] for p in res["players"]} == set(UIDS)
+    assert res["topology"]["zones"]["arc"]["player"] == ARC
+
+    await ws.send_json({"id": 2, "type": "musikanlage/quick_action", "action": "radio_schlaf", "dry_run": True})
+    res = (await ws.receive_json())["result"]
+    assert any("FV:2/4" in step for step in res["plan"])
+    assert not [l for l in fake.log if l[1] == "play"]  # dry run: nothing played
+
+    await ws.send_json({"id": 3, "type": "musikanlage/quick_action", "action": "radio_schlaf"})
+    assert (await ws.receive_json())["success"]
+    assert any(l[1] == "play" and l[2] == "FV:2/4" for l in fake.log)
+
+    bad = dict(res_topology := (await _get_topology(ws, 4)))
+    bad["quick_actions"] = [{"id": "x", "zones": ["nope"], "source": "none"}]
+    await ws.send_json({"id": 5, "type": "musikanlage/save", "topology": bad})
+    res = (await ws.receive_json())["result"]
+    assert res["saved"] is False and "nope" in res["errors"][0]
+
+    good = dict(res_topology)
+    good["zones"]["era"]["name"] = "Vorne"
+    await ws.send_json({"id": 6, "type": "musikanlage/save", "topology": good})
+    assert (await ws.receive_json())["result"]["saved"] is True
+    await hass.async_block_till_done()
+    fake.register()  # reload re-registered nothing of ours, but keep the simulator in place
+    await ws.send_json({"id": 7, "type": "musikanlage/get"})
+    assert (await ws.receive_json())["result"]["names"]["era"] == "Vorne"
+
+
+async def _get_topology(ws, msg_id):
+    await ws.send_json({"id": msg_id, "type": "musikanlage/get"})
+    return (await ws.receive_json())["result"]["topology"]
+
+
+async def test_follow_ap_joins_target_group(hass: HomeAssistant) -> None:
+    import yaml
+
+    topo = yaml.safe_load(TOPOLOGY)
+    topo["zones"]["arc"]["follow_ap"] = {"tracker": "device_tracker.arc", "aps": {"AA:AA:AA:AA:AA:01": "era"}}
+    topo["zones"]["arc"]["wireless"] = True
+    entry, fake = await _setup(hass, yaml.safe_dump(topo))
+    fake._set(ERA, "playing", media_content_id="x-sonosapi-stream:radio", volume_level=0.1)
+    hass.states.async_set("device_tracker.arc", "home", {"mac": "bb", "ap_mac": "aa:aa:aa:aa:aa:02"})
+    await hass.async_block_till_done()
+    assert not any(l[1] == "join" for l in fake.log)
+    hass.states.async_set("device_tracker.arc", "home", {"mac": "bb", "ap_mac": "aa:aa:aa:aa:aa:01"})
+    await hass.async_block_till_done()
+    for _ in range(50):
+        if any(l[1] == "join" for l in fake.log):
+            break
+        await asyncio.sleep(0.05)
+    assert (ERA, "join", (ERA, ARC)) in fake.log
+    info = entry.runtime_data.ap_info()[0]
+    assert info["target"] == "era" and info["connected"]

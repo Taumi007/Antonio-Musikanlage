@@ -20,12 +20,42 @@ class MixerConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class QuickAction:
+    """A dashboard button: one route with fixed parameters."""
+
+    id: str
+    name: str
+    zones: tuple[str, ...]
+    source: str  # "mixer:<interface>", "radio:<favourite>" or "none"
+    area: str = ""
+    icon: str = ""
+    input: str | None = None
+    preset: str = "normal"
+    mic: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class FollowAp:
+    """A portable speaker joins the zone its WiFi access point belongs to."""
+
+    zone: str  # the portable zone
+    tracker: str  # UniFi device_tracker of the speaker (attribute ap_mac)
+    aps: dict[str, str]  # ap_mac (lower case) -> zone id to join
+    auto: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class Topology:
     zones: dict[str, Zone]
     interfaces: dict[str, Interface]
     mixers: dict[str, MixerConfig]
     favorites: dict[str, str]
     max_radio_volume: float
+    quick_actions: tuple[QuickAction, ...] = ()
+    follow_ap: tuple[FollowAp, ...] = ()
+    names: dict[str, str] = field(default_factory=dict)  # zone id -> display name
+    areas: dict[str, str] = field(default_factory=dict)  # zone id -> area label
+    raw: dict[str, Any] = field(default_factory=dict)
 
     def level_table(self) -> dict[tuple[str, Preset], float]:
         return {(m.id, p): db for m in self.mixers.values() for p, db in m.levels.items()}
@@ -102,10 +132,62 @@ def parse_topology(raw: dict[str, Any], uids: dict[str, str]) -> Topology:
             if not 0.0 <= v <= 1.0:
                 raise TopologyError(f"Zone {z.id}: volumes are 0..1, got {v}")
 
+    favorites = {str(k): str(v) for k, v in (raw.get("favorites") or {}).items()}
+
+    def check_source(where: str, source: str) -> None:
+        kind, _, ref = source.partition(":")
+        if kind == "mixer" and ref not in interfaces:
+            raise TopologyError(f"{where}: unknown interface {ref}")
+        if kind == "radio" and not ref:
+            raise TopologyError(f"{where}: radio needs a favourite")
+        if kind not in ("mixer", "radio", "none"):
+            raise TopologyError(f"{where}: unknown source {source}")
+
+    quick: list[QuickAction] = []
+    for i, q in enumerate(raw.get("quick_actions") or []):
+        qid = str(q.get("id") or f"qa{i + 1}")
+        qz = tuple(str(z) for z in q.get("zones") or [])
+        if not qz or any(z not in zones for z in qz):
+            raise TopologyError(f"Quick action {qid}: unknown or missing zones {list(qz)}")
+        source = str(q.get("source") or "")
+        check_source(f"Quick action {qid}", source)
+        quick.append(
+            QuickAction(
+                id=qid,
+                name=str(q.get("name") or qid),
+                zones=qz,
+                source=source,
+                area=str(q.get("area") or ""),
+                icon=str(q.get("icon") or ""),
+                input=None if q.get("input") in (None, "") else str(q["input"]),
+                preset=str(q.get("preset") or "normal"),
+                mic=bool(q.get("mic", True)),
+            )
+        )
+
+    follow: list[FollowAp] = []
+    for zid, z in (raw.get("zones") or {}).items():
+        fa = z.get("follow_ap")
+        if not fa:
+            continue
+        aps = {str(k).lower(): str(v) for k, v in (fa.get("aps") or {}).items()}
+        for target in aps.values():
+            if target not in zones or target == zid:
+                raise TopologyError(f"Zone {zid}: follow_ap target {target} is not another zone")
+        if not fa.get("tracker"):
+            raise TopologyError(f"Zone {zid}: follow_ap needs a tracker")
+        follow.append(FollowAp(zone=zid, tracker=str(fa["tracker"]), aps=aps, auto=bool(fa.get("auto", True))))
+
+    zones_raw = raw.get("zones") or {}
     return Topology(
         zones=zones,
         interfaces=interfaces,
         mixers=mixers,
-        favorites={str(k): str(v) for k, v in (raw.get("favorites") or {}).items()},
+        favorites=favorites,
         max_radio_volume=float(raw.get("max_radio_volume", 0.5)),
+        quick_actions=tuple(quick),
+        follow_ap=tuple(follow),
+        names={zid: str(z.get("name") or zid) for zid, z in zones_raw.items()},
+        areas={zid: str(z.get("area") or "") for zid, z in zones_raw.items()},
+        raw=raw,
     )

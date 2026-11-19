@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musikanlage Testumgebung</title>
+<style>
+  :root { --primary-background-color:#111; --card-background-color:#1c1c1c; --primary-text-color:#e1e1e1; --secondary-text-color:#9b9b9b;
+    --divider-color:rgba(225,225,225,.12); --primary-color:#4682b4; --disabled-text-color:#6f6f6f; --error-color:#ef5350; --app-header-background-color:#1c1c1c; }
+  :root.light { --primary-background-color:#fafafa; --card-background-color:#fff; --primary-text-color:#212121; --secondary-text-color:#727272; --divider-color:rgba(0,0,0,.12); --app-header-background-color:#fff; }
+  html, body { margin:0; height:100%; background:var(--primary-background-color); }
+  musikanlage-panel { display:flex; height:100vh; }
+</style>
+</head>
+<body>
+<musikanlage-panel></musikanlage-panel>
+<script type="module">
+  if (location.hash.includes("light")) document.documentElement.classList.add("light");
+  const P = (s, v, uri, extra = {}) => ({ state: s, attributes: { volume_level: v, media_content_id: uri, group_members: [], friendly_name: "Sonos", ...extra } });
+  const states = {
+    "media_player.restaurant_sonos": P("playing", 0.75, "x-sonos-htastream:RINCON_AMP01400:spdif", { friendly_name: "Restaurant Sonos" }),
+    "media_player.bar_sonos": P("playing", 0.8, "x-sonos-htastream:RINCON_AMP01400:spdif", { friendly_name: "Bar Sonos" }),
+    "media_player.zimmer_1_sonos": P("playing", 0.49, "x-sonos-htastream:RINCON_AMP01400:spdif", { friendly_name: "Zimmer 1 Sonos" }),
+    "media_player.move_2": P("playing", 0.11, "x-rincon-mp3radio://antenne", { friendly_name: "Move 2", media_channel: "Antenne Vorarlberg" }),
+    "sensor.musikanlage_route": { state: "idle", attributes: { graph: {}, options: {} } },
+  };
+  for (const [k, v] of Object.entries(states)) v.entity_id = k;
+  const topology = {
+    max_radio_volume: 0.5,
+    mixers: { restaurant: { type: "behringer_entities", prefix: "restaurant_mixer", inputs: { ext: [3, 4], pc: [5, 6], aux1: [7, 8] }, mic_channel: 1, mic_db: 0, levels: { normal: -24, lauter: -15, party: -6 } },
+              bar: { type: "behringer_entities", prefix: "xr12w_12_8d_13", inputs: { pc: [5, 6], dj: [7, 8], tv: [11, 12] }, mic_channel: 1, mic_db: 0, levels: { normal: -23.6, lauter: -15, party: -6 } } },
+    interfaces: { restaurant_hdmi: { player: "media_player.restaurant_sonos", kind: "hdmi", mixer: "restaurant" },
+                  bar_line_in: { player: "media_player.bar_sonos", kind: "line_in", mixer: "bar" } },
+    zones: {
+      restaurant: { player: "media_player.restaurant_sonos", name: "Restaurant", area: "Restaurant", mixer_volume: { restaurant: 0.75, bar: 0.75 }, radio_volume: { normal: 0.2, lauter: 0.45, party: 0.75 } },
+      bar: { player: "media_player.bar_sonos", name: "Bar", area: "Bar", mixer_volume: { restaurant: 0.8, bar: 0.8 }, radio_volume: { normal: 0.35, lauter: 0.55, party: 0.8 } },
+      zimmer_1: { player: "media_player.zimmer_1_sonos", name: "Zimmer 1", area: "Bar", mixer_volume: { restaurant: 0.49, bar: 0.6 }, radio_volume: { normal: 0.15, lauter: 0.35, party: 0.7 } },
+      garten: { player: "media_player.move_2", name: "Move 2", area: "Garten", wireless: true, mixer_volume: { restaurant: 0.8, bar: 0.8 }, radio_volume: { normal: 0.11, lauter: 0.3, party: 0.5 },
+                follow_ap: { tracker: "device_tracker.move_2", auto: true, aps: { "aa:01": "restaurant", "aa:02": "bar" } } },
+    },
+    favorites: { antenne: "FV:2/5", oe3: "FV:2/4" },
+    quick_actions: [
+      { id: "restaurantbetrieb", name: "Restaurantbetrieb", area: "Restaurant", icon: "radio", zones: ["restaurant", "garten"], source: "radio:antenne", preset: "normal", mic: false },
+      { id: "event", name: "Event mit Mikro", area: "Restaurant", icon: "mic", zones: ["restaurant", "bar", "zimmer_1"], source: "mixer:restaurant_hdmi", input: "pc", preset: "normal", mic: true },
+      { id: "bar_pc", name: "Musik vom PC", area: "Bar", icon: "mixer", zones: ["bar", "zimmer_1"], source: "mixer:bar_line_in", input: "pc", preset: "normal", mic: true },
+      { id: "bar_stop", name: "Bar aus", area: "Bar", icon: "stop", zones: ["bar", "zimmer_1"], source: "none", preset: "normal" },
+    ],
+  };
+  const graph = { nodes: [{ id: "mixer:restaurant", type: "mixer", levels_db: { 1: 0, 5: -18.7, 6: -18.7 } }, { id: "mixer:bar", type: "mixer", levels_db: { 1: 0, 5: -90 } }, { id: "radio", type: "radio" }],
+    edges: [{ from: "mixer:restaurant", to: "iface:restaurant_hdmi", active: true }, { from: "iface:restaurant_hdmi", to: "zone:restaurant", active: true },
+            { from: "iface:restaurant_hdmi", to: "zone:bar", active: true }, { from: "iface:restaurant_hdmi", to: "zone:zimmer_1", active: true }, { from: "radio", to: "zone:garten", active: true }] };
+  const data = {
+    entry_id: "x", topology, names: { restaurant: "Restaurant", bar: "Bar", zimmer_1: "Zimmer 1", garten: "Move 2" }, areas: {},
+    quick_actions: topology.quick_actions, graph, options: {},
+    follow_ap: [{ zone: "garten", tracker: "device_tracker.move_2", connected: true, ap_mac: "aa:01", ap_name: "Restaurant AP", target: "restaurant", auto: true }],
+    status: { busy: false, last_route: { zones: ["restaurant", "bar", "zimmer_1"], kind: "mixer", interface: "restaurant_hdmi", input: "pc", favorite: null, preset: "normal", mic: true },
+      last_plan: ["mixer restaurant: fade * -> -90 dB in 1s", "restaurant: play x-sonos-htastream:RINCON_AMP01400:spdif", "restaurant: join bar,zimmer_1", "mixer restaurant: fade pc -> -24 dB in 3s"],
+      last_warnings: ["['bar', 'zimmer_1'] join the HDMI group and play ~40 ms after the HDMI device"], last_error: null, guard_events: [] },
+    players: [["media_player.restaurant_sonos", "RINCON_AMP01400", "Restaurant Sonos"], ["media_player.bar_sonos", "RINCON_FIVE01400", "Bar Sonos"], ["media_player.zimmer_1_sonos", "RINCON_ERA01400", "Zimmer 1 Sonos"], ["media_player.move_2", "RINCON_MOVE01400", "Move 2"], ["media_player.kuche_sonos", "RINCON_K01400", "Küche"]]
+      .map(([entity_id, uid, name], i) => ({ entity_id, uid, name, mac: `00:00:00:00:00:0${i}` })),
+    trackers: [{ entity_id: "device_tracker.move_2", name: "Move 2", mac: "00:00:00:00:00:03", ap_mac: "aa:01", state: "home", is_ap: false },
+               { entity_id: "device_tracker.restaurant_ap", name: "Restaurant AP", mac: "aa:01", state: "home", is_ap: true },
+               { entity_id: "device_tracker.bar_ap", name: "Bar AP", mac: "aa:02", state: "home", is_ap: true }],
+  };
+  window.calls = [];
+  const hass = { states, callWS: async (m) => { window.calls.push(m);
+      if (m.type === "musikanlage/get") return structuredClone(data);
+      if (m.type === "musikanlage/validate") return { errors: [] };
+      if (m.type === "musikanlage/save") return { saved: true, errors: [] };
+      if (m.type === "musikanlage/quick_action") return { plan: ["bar: ramp volume -> 0.00", "bar: pause", "bar: play favourite FV:2/5"], warnings: [] };
+      if (m.type === "musikanlage/follow") return { plan: ["garten: join"] };
+      throw new Error("unbekannt " + m.type); },
+    callService: async (d, s, x) => window.calls.push({ d, s, x }) };
+  await import("../../custom_components/musikanlage/frontend/musikanlage-panel.js");
+  const el = document.querySelector("musikanlage-panel");
+  el.hass = hass;
+  window.panel = el;
+</script>
+</body>
+</html>

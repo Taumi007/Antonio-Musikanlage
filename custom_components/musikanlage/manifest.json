@@ -12,11 +12,12 @@
     "media_player",
     "http",
     "frontend",
-    "panel_custom"
+    "panel_custom",
+    "websocket_api"
   ],
   "documentation": "https://github.com/Taumi007/Antonio-Musikanlage",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Taumi007/Antonio-Musikanlage/issues",
   "requirements": [],
-  "version": "0.2.1"
+  "version": "0.3.0"
 }
