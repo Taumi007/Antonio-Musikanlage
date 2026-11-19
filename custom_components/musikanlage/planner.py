@@ -32,7 +32,7 @@ from .model import (
     Zone,
     validate_route,
 )
-from .sonos_uri import interface_uri, is_input_stream, same_stream, uid_from_uri
+from .sonos_uri import interface_uri, is_input_stream, same_stream, stream_key, uid_from_uri
 
 MIXER_OFF_DB = -90.0
 
@@ -240,16 +240,41 @@ def plan_route(
     plan.add(*(Unjoin(z) for z in unjoin))
 
     # Stage 3: stop the old content (the driver skips zones that already stopped).
-    plan.add(*(Pause(z) for z in target if state[z].playing and z not in keep_streaming))
+    # The TV/HDMI input cannot be paused (seen live on an Arc: it stays
+    # "playing"), those zones are held at volume 0 until the new stream runs.
+    unpausable = {
+        z
+        for z in target
+        if state[z].playing and z not in keep_streaming and (stream_key(state[z].uri) or ("",))[0] == "hdmi"
+    }
+    plan.add(
+        *(
+            Pause(z)
+            for z in target
+            if state[z].playing and z not in keep_streaming and z not in unpausable
+        )
+    )
 
     if route.kind is SourceKind.NONE:
-        # Leave every zone paused at its safe radio volume.
-        plan.add(*(VolumeSet(z, zones[z].radio_volume.get(Preset.NORMAL, 0.1)) for z in target))
+        # Leave every zone paused at its safe radio volume (HDMI zones at 0).
+        plan.add(
+            *(
+                VolumeSet(z, 0.0 if z in unpausable else zones[z].radio_volume.get(Preset.NORMAL, 0.1))
+                for z in target
+            )
+        )
+        if unpausable:
+            plan.warnings.append(f"HDMI input cannot be paused: {sorted(unpausable)} left at volume 0")
         return plan
 
     # Stage 4: set the final Sonos volumes while everything is silent.
     if route.kind is SourceKind.MIXER and use_mixer_fade:
-        plan.add(*(VolumeSet(z, zones[z].mixer_volume.get(mixer, 0.0)) for z in target))
+        plan.add(
+            *(
+                VolumeSet(z, 0.0 if z in unpausable else zones[z].mixer_volume.get(mixer, 0.0))
+                for z in target
+            )
+        )
     else:
         # Radio: start at 0 and ramp up after playback started.
         plan.add(*(VolumeSet(z, 0.0) for z in target))
@@ -268,6 +293,9 @@ def plan_route(
 
     # Stage 6: bring the level up.
     if route.kind is SourceKind.MIXER and use_mixer_fade:
+        # HDMI zones held at 0: the new stream is confirmed and the mixer is
+        # still at -inf, so the reference volume can be set silently now.
+        plan.add(*(VolumeSet(z, zones[z].mixer_volume.get(mixer, 0.0)) for z in sorted(unpausable)))
         level = mixer_level_db.get((mixer, route.preset), -20.0)
         plan.add(MixerMic(mixer, route.mic))
         plan.add(MixerFade(mixer, (route.mixer_input,), level, timing.mixer_up))

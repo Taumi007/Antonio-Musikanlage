@@ -168,3 +168,31 @@ def test_unjoin_from_foreign_group_before_pause():
     pause = index(plan, lambda s: s == Pause("zimmer_1"))
     assert unjoin < pause
     assert not any(getattr(s, "zone", None) == "bar" for s in flat(plan))
+
+
+def test_hdmi_zone_is_not_paused_but_held_at_zero():
+    """Seen live: an Arc on its TV input ignores pause and stays 'playing'."""
+    current = {
+        "restaurant": ZoneState(playing=True, uri="x-sonos-htastream:RINCON_AMP:spdif", volume=0.25,
+                                group=("restaurant",)),
+        "bar": ZoneState(playing=True, uri="x-rincon-stream:RINCON_FIVE_L", volume=0.8, group=("bar",)),
+    }
+    route = Route(("bar", "restaurant"), SourceKind.MIXER, interface="bar_line_in", mixer_input="5", mic=False)
+    plan = plan_route(route, ZONES, IFACES, current, mixer_level_db=LEVELS)
+    steps = flat(plan)
+    assert Pause("restaurant") not in steps
+    assert VolumeSet("restaurant", 0.0) in steps
+    zero = index(plan, lambda s: s == VolumeSet("restaurant", 0.0))
+    join = index(plan, lambda s: isinstance(s, Join))
+    ref = index(plan, lambda s: s == VolumeSet("restaurant", 0.75))
+    up = index(plan, lambda s: isinstance(s, MixerFade) and s.inputs == ("5",))
+    assert zero < join < ref < up
+
+
+def test_stop_hdmi_zone_left_at_zero():
+    current = {"restaurant": ZoneState(playing=True, uri="x-sonos-htastream:RINCON_AMP:spdif", volume=0.5,
+                                       group=("restaurant",))}
+    plan = plan_route(Route(("restaurant",), SourceKind.NONE), ZONES, IFACES, current)
+    steps = flat(plan)
+    assert Pause("restaurant") not in steps
+    assert steps[-1] == VolumeSet("restaurant", 0.0)
