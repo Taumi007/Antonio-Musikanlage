@@ -249,3 +249,15 @@ def test_member_missing_from_hdmi_group_is_joined_only():
     steps = flat(plan_route(route, ZONES, IFACES, current, mixer_level_db=LEVELS))
     assert Join("restaurant", ("bar",)) in steps
     assert not any(isinstance(s, (Unjoin, PlayUri)) for s in steps)
+
+
+def test_interface_uid_override_for_stereo_pair():
+    from musikanlage.topology import parse_topology
+
+    raw = {
+        "zones": {"bar": {"player": "media_player.bar_sonos"}},
+        "interfaces": {"bar_line_in": {"player": "media_player.bar_sonos", "kind": "line_in", "uid": "RINCON_LEFT01400"}},
+    }
+    topo = parse_topology(raw, {"media_player.bar_sonos": "RINCON_RIGHT01400"})
+    assert topo.interfaces["bar_line_in"].uid == "RINCON_LEFT01400"
+    assert topo.zones["bar"].uid == "RINCON_RIGHT01400"

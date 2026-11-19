@@ -1,0 +1,94 @@
+# Topologie Pizzeria Antonio (Echtsystem)
+# Startwerte aus den bestehenden Zahlen-Helpern (Stand 19.11.2026). Mixerpegel von Fader-Position in dB umgerechnet.
+
+# Wächter: startet etwas außerhalb der Musikanlage (Sonos-App, Alarm, Autoplay) Nicht-Mixer-Inhalt
+# lauter als das, wird es sofort auf die Normal-Lautstärke der Zone heruntergeregelt.
+max_radio_volume: 0.6
+
+mixers:
+  restaurant:
+    type: behringer_entities
+    prefix: restaurant_mixer            # number.restaurant_mixer_channel_<n>_fader
+    inputs: {ext: [3, 4], pc: [5, 6], aux1: [7, 8], aux2: [9, 10], aux3: [11, 12]}
+    mic_channel: 1
+    mic_db: 0.0                         # input_number.restaurant_mixer_lautstarke_mikrofon_normal = 75 → 0 dB
+    levels:                             # input_number.restaurant_mixer_lautstarke_musik_* = 22 / 38 / 75
+      normal: -34.8
+      lauter: -19.6
+      party: 0.0
+  bar:
+    type: behringer_entities
+    prefix: xr12w_12_8d_13              # number.xr12w_12_8d_13_channel_<n>_fader
+    inputs: {ext: [3, 4], pc: [5, 6], dj: [7, 8], aux: [9, 10], tv: [11, 12]}
+    mic_channel: 1
+    mic_db: 0.0                         # input_number.bar_mixer_lautstarke_mikrofon_normal = 75 → 0 dB
+    levels:                             # input_number.bar_mixer_lautstarke_musik_* = 33 / 45 / 75
+      normal: -23.6
+      lauter: -14.0
+      party: 0.0
+
+interfaces:
+  restaurant_hdmi:                      # Mixer → Analog-Toslink → Sonos-Toslink-HDMI-Adapter → Amp
+    player: media_player.restaurant_sonos
+    kind: hdmi
+    mixer: restaurant
+  bar_line_in:                          # Mixer → Analog-Eingang des LINKEN Five
+    player: media_player.bar_sonos
+    kind: line_in
+    mixer: bar
+    uid: RINCON_347E5CDE515001400       # linker Five; media_player.bar_sonos gehört in HA zum rechten (…515401400)
+  # Optional, falls du das Cinch-Kabel vom Restaurant-Mixer an den Amp-Line-In legst:
+  # restaurant_cinch: {player: media_player.restaurant_sonos, kind: line_in, mixer: restaurant}
+
+zones:
+  restaurant:
+    player: media_player.restaurant_sonos
+    name: Restaurant
+    area: Restaurant
+    mixer_volume: {restaurant: 0.75, bar: 0.75}
+    radio_volume: {normal: 0.20, lauter: 0.45, party: 0.75}
+  bar:
+    player: media_player.bar_sonos
+    name: Bar
+    area: Bar
+    mixer_volume: {restaurant: 0.80, bar: 0.80}
+    radio_volume: {normal: 0.35, lauter: 0.55, party: 0.80}
+  zimmer_1:
+    player: media_player.zimmer_1_sonos
+    name: Zimmer 1
+    area: Bar                           # läuft grundsätzlich mit der Bar, nur leiser
+    mixer_volume: {restaurant: 0.49, bar: 0.60}
+    radio_volume: {normal: 0.15, lauter: 0.35, party: 0.70}
+  garten:
+    player: media_player.move_2
+    name: Move 2
+    area: Garten
+    wireless: true                      # wird bei Routen mit Mikrofon abgelehnt
+    mixer_volume: {restaurant: 0.80, bar: 0.80}
+    radio_volume: {normal: 0.11, lauter: 0.30, party: 0.50}
+    # Erst möglich, wenn im Restaurant die UniFi-Network-Integration den Move 2 als Client erfasst:
+    # follow_ap:
+    #   tracker: device_tracker.move_2
+    #   auto: true
+    #   aps: {"<mac AP Restaurant>": restaurant, "<mac AP Bar>": bar}
+
+favorites:
+  antenne: "FV:2/5"                     # Antenne Vorarlberg
+  radio_vorarlberg: "FV:2/3"
+  oe3: "FV:2/4"                         # Hitradio Ö3
+
+quick_actions:
+  # Restaurant
+  - {id: restaurantbetrieb, name: Restaurantbetrieb, area: Restaurant, icon: radio, zones: [restaurant, garten], source: "radio:antenne", preset: normal}
+  - {id: restaurant_event, name: Event mit Mikro, area: Restaurant, icon: mic, zones: [restaurant], source: "mixer:restaurant_hdmi", input: pc, preset: normal, mic: true}
+  - {id: event_ueberall, name: Event überall (Mikro), area: Restaurant, icon: mic, zones: [restaurant, bar, zimmer_1], source: "mixer:restaurant_hdmi", input: pc, preset: normal, mic: true}
+  - {id: restaurant_aus, name: Restaurant aus, area: Restaurant, icon: stop, zones: [restaurant, garten], source: none}
+  # Bar
+  - {id: bar_pc, name: Musik vom PC, area: Bar, icon: mixer, zones: [bar, zimmer_1], source: "mixer:bar_line_in", input: pc, preset: normal, mic: true}
+  - {id: bar_pc_lauter, name: PC lauter, area: Bar, icon: mixer, zones: [bar, zimmer_1], source: "mixer:bar_line_in", input: pc, preset: lauter, mic: true}
+  - {id: bar_party, name: Party (DJ), area: Bar, icon: mixer, zones: [bar, zimmer_1], source: "mixer:bar_line_in", input: dj, preset: party, mic: true}
+  - {id: bar_radio, name: Radio, area: Bar, icon: radio, zones: [bar, zimmer_1], source: "radio:antenne", preset: normal}
+  - {id: bar_ueberall, name: Bar-Musik überall, area: Bar, icon: speakers, zones: [bar, zimmer_1, restaurant], source: "mixer:bar_line_in", input: pc, preset: normal, mic: false}
+  - {id: bar_aus, name: Bar aus, area: Bar, icon: stop, zones: [bar, zimmer_1], source: none}
+  # Garten
+  - {id: garten_radio, name: Radio Garten, area: Garten, icon: radio, zones: [garten], source: "radio:antenne", preset: normal}

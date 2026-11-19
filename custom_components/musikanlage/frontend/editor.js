@@ -201,6 +201,8 @@ export class Editor {
       h("div", {}, h("div", { class: "dtitle" }, id), h("div", { class: "muted" }, i.kind === "hdmi" ? "HDMI-Eingang: nur das eigene Gerät spielt ihn, andere treten seiner Gruppe bei" : "Analog-Eingang: kann von jedem Sonos abgespielt werden (75 ms Puffer)")),
       this.segment("Art", i, "kind", [["hdmi", "HDMI / Toslink"], ["line_in", "Line-In (Cinch)"]]),
       this.select("Gerät mit dem Eingang", i, "player", p.players.map((pl) => [pl.entity_id, `${pl.name} (${pl.entity_id})`])),
+      this.text("RINCON des Eingangs (nur bei Stereopaar)", i, "uid", { placeholder: p.uidOf(i.player) ?? "RINCON_…",
+        hint: "Leer = Gerät des Players. Bei einem Stereopaar hängt der Eingang oft am anderen Lautsprecher." }),
       this.select("Angeschlossener Mixer", i, "mixer", [["", "— keiner —"], ...Object.keys(this.d.mixers ?? {}).map((m) => [m, `Mixer ${m}`])]),
       this.removeBtn("Eingang entfernen", () => {
         delete this.d.interfaces[id];

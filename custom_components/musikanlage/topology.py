@@ -119,10 +119,14 @@ def parse_topology(raw: dict[str, Any], uids: dict[str, str]) -> Topology:
         mixer = i.get("mixer")
         if mixer and mixer not in mixers:
             raise TopologyError(f"Interface {iid}: unknown mixer {mixer}")
+        uid = str(i.get("uid") or uid_for(i["player"]))
+        if not uid.startswith("RINCON_"):
+            raise TopologyError(f"Interface {iid}: uid must start with RINCON_")
         interfaces[iid] = Interface(
             id=iid,
             player=i["player"],
-            uid=uid_for(i["player"]),
+            # Stereo pairs: HA's entity belongs to one speaker, the input may be on the other
+            uid=uid,
             kind=InterfaceKind(i["kind"]),
             mixer=mixer,
         )

@@ -94,7 +94,7 @@ class MusikanlagePanel extends HTMLElement {
   // Topologie mit RINCON-Kennungen für die Anzeige
   get topo() {
     const t = this.draft ?? {};
-    for (const i of Object.values(t.interfaces ?? {})) Object.defineProperty(i, "_uid", { value: this.uidOf(i.player), enumerable: false, configurable: true });
+    for (const i of Object.values(t.interfaces ?? {})) Object.defineProperty(i, "_uid", { value: i.uid || this.uidOf(i.player), enumerable: false, configurable: true });
     return t;
   }
 
